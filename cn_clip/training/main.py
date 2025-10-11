@@ -37,8 +37,9 @@ def is_master(args):
 
 # used to compare the pytorch version
 def torch_version_str_compare_lessequal(version1, version2):
-    v1 = [int(entry) for entry in version1.split("+")[0].split(".")]
-    v2 = [int(entry) for entry in version2.split("+")[0].split(".")]
+    v1 = [int(entry) for entry in version1.split("+")[0].split(".")[0:3]]
+    v2 = [int(entry) for entry in version2.split("+")[0].split(".")[0:3]]
+    print(v1, v2)
     assert len(v1) == 3, "Cannot parse the version of your installed pytorch! ({})".format(version1)
     assert len(v2) == 3, "Illegal version specification ({}). Should be in 1.X.Y format.".format(version2)
     return sorted([v1, v2])[0] == v1
@@ -58,9 +59,9 @@ def main():
 
     # Set output path
     time_suffix = strftime("%Y-%m-%d-%H-%M-%S", gmtime())
-    args.log_path = os.path.join(args.logs, args.name, "out_{}.log".format(time_suffix))
+    args.log_path = os.path.join(args.log_output, args.name, "out_{}.log".format(time_suffix))
 
-    args.checkpoint_path = os.path.join(args.logs, args.name, "checkpoints")
+    args.checkpoint_path = os.path.join(args.log_output, args.name, "checkpoints")
     if is_master(args):
         for dirname in [args.checkpoint_path]:
             if dirname:
@@ -107,8 +108,8 @@ def main():
         convert_weights(model)
 
     if args.grad_checkpointing:
-        assert not torch_version_str_compare_lessequal(torch.__version__, "1.8.0"), \
-            "Currently our grad_checkpointing is not compatible with torch version <= 1.8.0."
+        # assert not torch_version_str_compare_lessequal(torch.__version__, "1.8.0"), \
+        #     "Currently our grad_checkpointing is not compatible with torch version <= 1.8.0."
         model.set_grad_checkpointing()
         logging.info("Grad-checkpointing activated.")
 
@@ -178,7 +179,7 @@ def main():
     # Log and save hyper-params.
     if is_master(args):
         logging.info("Params:")
-        params_file = os.path.join(args.logs, args.name, "params_{}.txt".format(time_suffix))
+        params_file = os.path.join(args.log_output, args.name, "params_{}.txt".format(time_suffix))
         with open(params_file, "w", encoding="utf-8") as f:
             for name in sorted(vars(args)):
                 val = getattr(args, name)
@@ -239,9 +240,9 @@ def main():
     cudnn.benchmark = True
     cudnn.deterministic = False
 
-    # determine if this worker should save logs and checkpoints.
+    # determine if this worker should save log and checkpoints.
     # only do so if it is the 0th worker.
-    args.should_save = (args.logs is not None and args.logs != '' and args.logs.lower() != 'none') and is_master(args)
+    args.should_save = (args.log_output is not None and args.log_output != '' and args.log_output.lower() != 'none') and is_master(args)
 
     # load teacher model to distillation
     if args.distillation:
